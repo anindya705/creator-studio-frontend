@@ -2,58 +2,131 @@ import React, { useState } from 'react';
 import { SafeAreaView, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet, Image, View } from 'react-native';
 import Typewriter from 'react-native-typewriter';
 import axios from 'axios'; // Import Axios
+import LinearGradient from 'react-native-linear-gradient'; // Import LinearGradient
+import ContentCard from '../ContentCard/ContentCard';
+
 
 export default function Recommender() {
   const [handle, setHandle] = useState('');
   const [loading, setLoading] = useState(false);
   const [blurb, setBlurb] = useState('');
+  const [blurb2, setBlurb2] = useState('');
   const [typedMessages, setTypedMessages] = useState([]);
+  const [animationsCompleted, setAnimationsCompleted] = useState(false); // New state for tracking animations completion
+
 
   const messages = [
     "Analyzing your followers' taste...",
     "Crafting personalized recommendations...",
-    "Finalizing tips for your handle..."
+    "Finalizing tips for your next post..."
   ];
 
-  const [apiBlurb, setApiBlurb] = useState(''); // New state for API response
+  const [apiBlurb, setApiBlurb] = useState(''); 
+  const [apiBlurb2, setApiBlurb2] = useState(''); 
+
 
   const handleGenerate = () => {
     setLoading(true);
     setBlurb('');
+    setBlurb2('');
     setTypedMessages([]);
-    setApiBlurb(''); // Reset API blurb state
+    setApiBlurb('');
+    setApiBlurb2('');
 
-    axios.get(`http://localhost:2020/api/v1/instagram/handle?handle=${handle}`)
-      .then(response => {
-        setApiBlurb(response.data.result._id); // Store API response in state
-      })
-      .catch(error => {
-        setBlurb("Account Not Found")
+
+    if (handle !== 'lukethorssen') {
+      setBlurb("Please put in a valid account.");
+      setLoading(false);
+      return;
+    }
+
+    axios.get(`https://vlogmi-f37db73e2a60.herokuapp.com/api/v1/instagram/all`)
+    .then(response => {
+        // Assuming response.data contains the array of data
+        const allData = response.data.result;
+        // Filter to find the data for "videoidea1" and "videoidea2"
+        const videoIdea1Data = allData.find(item => item.name === 'videoidea1');
+        const videoIdea2Data = allData.find(item => item.name === 'videoidea2');
+
+        setApiBlurb(videoIdea1Data.data);
+        setApiBlurb2(videoIdea2Data.data);
+
+    })
+    .catch(error => {
         console.error('Error:', error);
         setLoading(false);
-      });
+    });
+
+
+    setAnimationsCompleted(false)
+
   };
 
   const onTypingEnd = () => {
     const nextIndex = typedMessages.length;
     if (nextIndex < messages.length - 1) {
       setTypedMessages(currentTypedMessages => [...currentTypedMessages, messages[nextIndex]]);
-      console.log("here")
     } else if (nextIndex === messages.length - 1) {
       setLoading(false);
-      setBlurb(apiBlurb || `It's recommended to focus on lifestyle content with a blend of travel and fashion. Engaging with followers through stories and regular posts about daily activities would be beneficial.`);
-      console.log("blurb")
+      setAnimationsCompleted(true); 
+      setTypedMessages([]);
+      // setBlurb(apiBlurb || `It's recommended to focus on lifestyle content with a blend of travel and fashion. Engaging with followers through stories and regular posts about daily activities would be beneficial.`);
     }
   };
+
+
+
+  const parseContent = (contentString) => {
+    const titleMatch = contentString.match(/Title: '([^']+)'/); // Capture any character between ' and ' after Title:
+    // Look for "Description: " and capture everything after it
+    const descriptionMatch = contentString.match(/Description: (.*)/);
+    console.log(descriptionMatch)
+    return {
+      title: titleMatch ? titleMatch[1].trim() : '',
+      // If descriptionMatch is found, return everything after "Description: "
+      // otherwise, return an empty string
+      description: descriptionMatch ? descriptionMatch[1].trim() : '',
+    };
+  };
+  
+  
+
+  const renderContent = () => {
+    // Assume apiBlurb is the string you got from the API
+    if (apiBlurb) {
+      const { title, description } = parseContent(apiBlurb);
+      return (
+        <ContentCard
+          title={title}
+          description={description}
+        />
+      );
+    }
+  };
+
+  const renderContent2 = () => {
+    // Assume apiBlurb is the string you got from the API
+    if (apiBlurb2) {
+      const { title, description } = parseContent(apiBlurb2);
+      return (
+        <ContentCard
+          title={title}
+          description={description}
+        />
+      );
+    }
+  };
+
+
 
 
   return (
     <SafeAreaView style={styles.container}>
       <Image
         style={styles.logo}
-        source={require('/Users/anindyasharma/Desktop/vlogmi/creator/creator-studio/components/Recommender/logp.png')} // Replace with your local logo image path
+        source={require('./logp.png')} // Replace with your local logo image path
       />
-      <Text style={styles.greetingText}>Hey, {handle || 'there!'}</Text>
+      <Text style={styles.greetingText}>Hey, { handle || 'there!'}</Text>
       <TextInput
         style={styles.input}
         onChangeText={text => setHandle(text)}
@@ -69,7 +142,7 @@ export default function Recommender() {
           <Text style={styles.buttonText}>Let's go!</Text>
         )}
       </TouchableOpacity>
-
+      {blurb && <Text style={styles.blurbText}>{blurb}</Text>}
       {!blurb && (
       <View>
         {typedMessages.map((msg, index) => (
@@ -87,11 +160,9 @@ export default function Recommender() {
         )}
       </View>
     )}
-
-    {blurb && <Text style={styles.blurbText}>{blurb}</Text>}
-  </SafeAreaView>
-
-
+      {animationsCompleted && renderContent()}
+      {animationsCompleted && renderContent2()}
+    </SafeAreaView>
   );
 }
 
@@ -150,12 +221,24 @@ const styles = StyleSheet.create({
     fontStyle: 'italic', // adds a bit of flair
   },
 
+  blurbContainer: {
+    backgroundColor: '#1c1c1e', // A slightly lighter dark background to contrast with the overall dark theme
+    borderRadius: 20,
+    padding: 20,
+    marginTop: 10,
+    shadowColor: '#FFF', // White color for the shadow to be subtle
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 10, // for Android
+    borderWidth: 1,
+    borderColor: '#E1306C', // Using the app's accent color for the border
+  },
   blurbText: {
     color: '#FFF',
     textAlign: 'center',
-    paddingHorizontal: 10,
-    fontFamily: 'Verdana', // clean and readable
+    fontFamily: 'Arial', // You can choose any font that suits your design
     fontSize: 18,
-    fontWeight: '100',
-  },
-});
+    fontWeight: '400', // Normal weight to keep it clean and professional
+    marginBottom: 10, // Adds some space below the text if needed
+  },});
